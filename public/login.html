@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title data-i18n="login.pageTitle">Login – Strevio</title>
+  <link rel="stylesheet" href="/assets/css/common.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .auth-wrapper { width: 100%; max-width: 420px; padding: 20px; }
+    .auth-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 40px 32px; box-shadow: var(--shadow-lg);
+    }
+    .auth-logo { text-align: center; margin-bottom: 28px; }
+    .auth-logo h1 { font-size: 22px; font-weight: 800; }
+    .auth-logo h1 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .auth-logo p { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
+    .auth-footer { text-align: center; margin-top: 20px; font-size: 13px; color: var(--text-secondary); }
+    .error-msg { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
+    .back-link { position: fixed; top: 20px; left: 20px; font-size: 13px; color: var(--text-muted); }
+    .back-link:hover { color: var(--text-primary); }
+    .lang-switch { position: fixed; top: 20px; right: 20px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); padding: 4px 8px; font-size: 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <a href="/" class="back-link" data-i18n="login.backHome">← Home</a>
+  <select class="lang-switch" id="langSwitch"></select>
+
+  <div class="auth-wrapper">
+    <div class="auth-card animate-in">
+      <div class="auth-logo">
+        <h1>⚡ <span>Strevio</span></h1>
+        <p data-i18n="login.subtitle">Login to your account</p>
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label data-i18n="login.email">Email</label>
+          <input type="email" class="form-input" id="email" data-i18n-placeholder="login.emailPlaceholder" placeholder="you@example.com" required autofocus />
+        </div>
+        <div class="form-group">
+          <label data-i18n="login.password">Password</label>
+          <input type="password" class="form-input" id="password" placeholder="••••••••" required />
+        </div>
+        <div class="error-msg" id="errorMsg"></div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg mt-2" id="submitBtn" data-i18n="login.submit">Login</button>
+      </form>
+      <div class="auth-footer">
+        <span data-i18n="login.noAccount">Don't have an account?</span> <a href="/register" data-i18n="login.registerLink">Sign Up</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/i18n.js"></script>
+  <script>
+    const langSelect = document.getElementById('langSwitch');
+    i18n.SUPPORTED.forEach(lang => {
+      const opt = document.createElement('option');
+      opt.value = lang; opt.textContent = i18n.LANG_NAMES[lang];
+      if (lang === i18n.getCurrentLang()) opt.selected = true;
+      langSelect.appendChild(opt);
+    });
+    langSelect.addEventListener('change', async () => { await i18n.loadLang(langSelect.value); i18n.applyTranslations(); });
+    (async () => { await i18n.loadLang(i18n.getCurrentLang()); i18n.applyTranslations(); })();
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const errEl = document.getElementById('errorMsg');
+      errEl.style.display = 'none';
+      btn.disabled = true; btn.textContent = i18n.t('login.loggingIn') || 'Logging in...';
+
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          document.cookie = `token=${data.token};path=/;max-age=${60*60*24*7}`;
+          window.location.href = data.user.role === 'admin' ? '/admin' : '/dashboard';
+        } else {
+          errEl.textContent = data.error || (i18n.t('login.failed') || 'Login failed');
+          errEl.style.display = 'block';
+        }
+      } catch(err) {
+        errEl.textContent = i18n.t('login.connectionError') || 'Connection error';
+        errEl.style.display = 'block';
+      }
+      btn.disabled = false; btn.textContent = i18n.t('login.submit') || 'Login';
+    });
+  </script>
+</body>
+</html>

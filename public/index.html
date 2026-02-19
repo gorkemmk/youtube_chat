@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strevio – YouTube Chat Overlay for OBS</title>
+  <link rel="stylesheet" href="/assets/css/common.css" />
+  <style>
+    body { overflow-x: hidden; }
+
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 16px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(11,13,23,0.75); backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(30,33,64,0.5);
+    }
+    .nav-logo { font-size: 20px; font-weight: 800; }
+    .nav-logo span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-links { display: flex; gap: 24px; align-items: center; }
+    .nav-links a { color: var(--text-secondary); font-size: 14px; font-weight: 500; }
+    .nav-links a:hover { color: var(--text-primary); }
+    .lang-switch { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); padding: 4px 8px; font-size: 12px; cursor: pointer; }
+
+    .hero {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 120px 24px 80px; position: relative;
+    }
+    .hero::before {
+      content: ''; position: absolute; top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(ellipse at 50% 40%, rgba(108,99,255,0.08) 0%, transparent 60%),
+                  radial-gradient(ellipse at 20% 80%, rgba(178,75,243,0.05) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .hero-content { position: relative; max-width: 720px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--accent-light); border: 1px solid var(--border-accent);
+      border-radius: var(--radius-full); padding: 6px 16px;
+      font-size: 12px; font-weight: 600; color: var(--accent);
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 5vw, 60px);
+      font-weight: 900; line-height: 1.1;
+      margin-bottom: 20px;
+    }
+    .hero h1 .highlight {
+      background: var(--gradient);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 18px; color: var(--text-secondary); max-width: 540px;
+      margin: 0 auto 32px; line-height: 1.7;
+    }
+    .hero-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .hero-visual {
+      margin-top: 60px; padding: 20px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+      max-width: 600px; margin-left: auto; margin-right: auto;
+    }
+    .hero-visual-header {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+      padding-bottom: 12px; border-bottom: 1px solid var(--border);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-red { background: #FF5C5C; } .dot-yellow { background: #FFD93D; } .dot-green { background: #00D68F; }
+
+    .demo-msg {
+      display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px;
+      border-radius: 8px; margin-bottom: 6px; animation: fadeInUp 0.5s ease;
+      background: rgba(108,99,255,0.04);
+    }
+    .demo-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--gradient); flex-shrink: 0; }
+    .demo-name { font-weight: 700; font-size: 13px; color: var(--accent); }
+    .demo-text { font-size: 13px; color: var(--text-secondary); }
+    .demo-sc {
+      background: linear-gradient(135deg, rgba(255,217,61,0.1), rgba(255,142,83,0.1));
+      border-left: 3px solid var(--yellow);
+    }
+
+    .section { padding: 80px 40px; max-width: 1100px; margin: 0 auto; }
+    .section-title {
+      text-align: center; font-size: 32px; font-weight: 800; margin-bottom: 12px;
+    }
+    .section-sub {
+      text-align: center; color: var(--text-secondary); font-size: 16px;
+      margin-bottom: 48px; max-width: 500px; margin-left: auto; margin-right: auto;
+    }
+
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 28px;
+      transition: var(--transition);
+    }
+    .feature-card:hover { border-color: var(--border-accent); transform: translateY(-2px); }
+    .feature-icon { font-size: 28px; margin-bottom: 16px; }
+    .feature-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .feature-card p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .step { text-align: center; }
+    .step-num {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--gradient); color: #fff; font-weight: 800; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px; box-shadow: var(--shadow-accent);
+    }
+    .step h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .step p { font-size: 13px; color: var(--text-secondary); }
+
+    .footer {
+      border-top: 1px solid var(--border); padding: 40px;
+      text-align: center; color: var(--text-muted); font-size: 13px;
+    }
+
+    .obs-tips {
+      background: rgba(255,217,61,0.05); border: 1px solid rgba(255,217,61,0.15);
+      border-radius: var(--radius); padding: 24px; margin-top: 24px;
+    }
+    .obs-tips h4 { color: var(--yellow); margin-bottom: 8px; }
+    .obs-tips ul { padding-left: 20px; }
+    .obs-tips li { font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+
+    @media (max-width: 768px) {
+      .nav { padding: 12px 20px; }
+      .section { padding: 60px 20px; }
+      .steps { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 32px; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-logo">⚡ <span>Strevio</span></div>
+    <div class="nav-links">
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <select class="lang-switch" id="langSwitch"></select>
+      <a href="/login" class="btn btn-outline btn-sm" data-i18n="nav.login">Login</a>
+      <a href="/register" class="btn btn-primary btn-sm" data-i18n="nav.register">Get Started Free</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-badge" data-i18n="hero.badge">🔴 Live Chat · Real-Time</div>
+      <h1><span data-i18n="hero.title">Bring your YouTube Chat</span><br><span class="highlight" data-i18n="hero.titleHighlight">to OBS</span></h1>
+      <p data-i18n="hero.subtitle">Connect your channel, go live — chat appears automatically in your overlay. Setup takes seconds.</p>
+      <div class="hero-buttons">
+        <a href="/register" class="btn btn-primary btn-xl" data-i18n="hero.cta">Get Started Free →</a>
+        <a href="#how" class="btn btn-outline btn-xl" data-i18n="hero.howItWorks">How It Works?</a>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hero-visual-header">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+          <span style="margin-left:8px;font-size:12px;color:var(--text-muted)">OBS Chat Overlay</span>
+        </div>
+        <div class="demo-msg" style="animation-delay:0.1s">
+          <div class="demo-avatar"></div>
+          <div><span class="demo-name">Alex</span> <span class="demo-text">Stream is looking great! 🔥</span></div>
+        </div>
+        <div class="demo-msg demo-sc" style="animation-delay:0.3s">
+          <div class="demo-avatar" style="background:var(--gradient-warm)"></div>
+          <div><span style="background:var(--yellow);color:#000;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700">💰 $50</span> <span class="demo-name" style="color:var(--yellow)">Mike</span> <span class="demo-text">Amazing content, keep it up!</span></div>
+        </div>
+        <div class="demo-msg" style="animation-delay:0.5s">
+          <div class="demo-avatar" style="background:var(--gradient-green)"></div>
+          <div><span class="demo-name" style="color:var(--green)">🔧 Mod_Sarah</span> <span class="demo-text">Remember to follow chat rules 👍</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="features">
+    <h2 class="section-title"><span data-i18n="features.title">Why Strevio?</span></h2>
+    <p class="section-sub" data-i18n="features.subtitle">Designed for professional streamers.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔄</div>
+        <h3 data-i18n="features.autoDetect">Auto Detection</h3>
+        <p data-i18n="features.autoDetectDesc">Connect your channel and we handle the rest. Chat starts when you stream, stops when you're done.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3 data-i18n="features.customOverlay">Customizable Overlay</h3>
+        <p data-i18n="features.customOverlayDesc">Font, color, position, opacity, animation — adjust everything from the dashboard. Unlimited design with CSS support.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💰</div>
+        <h3 data-i18n="features.superChat">Super Chat & Membership</h3>
+        <p data-i18n="features.superChatDesc">Super Chats stand out with special animations. New memberships are noticed instantly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3 data-i18n="features.realTime">Real-Time</h3>
+        <p data-i18n="features.realTimeDesc">Millisecond-delay chat flow using WebSocket. Handles thousands of messages seamlessly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3 data-i18n="features.noApiKey">No API Key Required</h3>
+        <p data-i18n="features.noApiKeyDesc">No YouTube API key or OAuth setup needed. Just paste your channel link and start.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3 data-i18n="features.stats">Statistics</h3>
+        <p data-i18n="features.statsDesc">Track stream performance with total messages, super chats, memberships and session history.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="how">
+    <h2 class="section-title" data-i18n="howItWorks.title">How It Works?</h2>
+    <p class="section-sub" data-i18n="howItWorks.subtitle">Complete setup in 3 steps.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3 data-i18n="howItWorks.step1Title">Create an Account</h3>
+        <p data-i18n="howItWorks.step1Desc">Sign up for free and access your dashboard.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3 data-i18n="howItWorks.step2Title">Connect Your Channel</h3>
+        <p data-i18n="howItWorks.step2Desc">Paste your YouTube channel link or ID in the dashboard. That's it.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3 data-i18n="howItWorks.step3Title">Add to OBS</h3>
+        <p data-i18n="howItWorks.step3Desc">Copy the overlay URL, add as Browser Source in OBS. Chat flows automatically when you stream.</p>
+      </div>
+    </div>
+
+    <div class="obs-tips">
+      <h4 data-i18n="obs.title">🛠 OBS Browser Source Settings</h4>
+      <ul>
+        <li><b data-i18n="obs.width">Width</b>: 400-500 · <b data-i18n="obs.height">Height</b>: 600-800</li>
+        <li><b data-i18n="obs.customCss">Custom CSS</b>: <code style="color:var(--accent);background:var(--bg-input);padding:2px 6px;border-radius:4px">body { background-color: rgba(0,0,0,0); margin: 0; overflow: hidden; }</code></li>
+        <li data-i18n="obs.tip1">If you get the "no page file" warning, disable "Local file".</li>
+        <li data-i18n="obs.tip2">You can test the page in OBS: right-click → Interact.</li>
+        <li data-i18n="obs.tip3">We recommend OBS version 28+.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>⚡ <span data-i18n="footer.tagline">Strevio — YouTube live stream chat overlay platform.</span></p>
+    <p style="margin-top:8px" data-i18n="footer.copyright">© 2026 Strevio. All rights reserved.</p>
+  </footer>
+
+  <script src="/assets/js/i18n.js"></script>
+  <script>
+    const langSelect = document.getElementById('langSwitch');
+    i18n.SUPPORTED.forEach(lang => {
+      const opt = document.createElement('option');
+      opt.value = lang;
+      opt.textContent = i18n.LANG_NAMES[lang];
+      if (lang === i18n.getCurrentLang()) opt.selected = true;
+      langSelect.appendChild(opt);
+    });
+    langSelect.addEventListener('change', async () => {
+      await i18n.loadLang(langSelect.value);
+      i18n.applyTranslations();
+    });
+
+    (async () => {
+      await i18n.loadLang(i18n.getCurrentLang());
+      i18n.applyTranslations();
+    })();
+
+    const token = localStorage.getItem('token');
+    if (token) {
+      const nav = document.querySelector('.nav-links');
+      const dashLink = document.createElement('a');
+      dashLink.href = '/dashboard';
+      dashLink.className = 'btn btn-primary btn-sm';
+      dashLink.textContent = '📊 Dashboard';
+      nav.innerHTML = '';
+      const ls = document.createElement('select');
+      ls.className = 'lang-switch';
+      ls.id = 'langSwitch';
+      i18n.SUPPORTED.forEach(lang => {
+        const opt = document.createElement('option');
+        opt.value = lang; opt.textContent = i18n.LANG_NAMES[lang];
+        if (lang === i18n.getCurrentLang()) opt.selected = true;
+        ls.appendChild(opt);
+      });
+      ls.addEventListener('change', async () => { await i18n.loadLang(ls.value); i18n.applyTranslations(); });
+      nav.appendChild(ls);
+      nav.appendChild(dashLink);
+    }
+  </script>
+</body>
+</html>

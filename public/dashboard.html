@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title data-i18n="dashboard.pageTitle">Dashboard – Strevio</title>
+  <link rel="stylesheet" href="/assets/css/common.css" />
+  <style>
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 240px; background: var(--bg-secondary); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .sidebar-logo { padding: 20px; border-bottom: 1px solid var(--border); }
+    .sidebar-logo h1 { font-size: 18px; font-weight: 800; }
+    .sidebar-logo h1 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .sidebar-nav { flex: 1; padding: 12px; }
+    .sidebar-nav a {
+      display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+      border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 13px;
+      font-weight: 500; margin-bottom: 2px; transition: var(--transition);
+    }
+    .sidebar-nav a:hover, .sidebar-nav a.active { background: var(--bg-hover); color: var(--text-primary); }
+    .sidebar-nav a.active { background: var(--accent-light); color: var(--accent); border-left: 2px solid var(--accent); }
+    .sidebar-footer { padding: 16px; border-top: 1px solid var(--border); }
+    .sidebar-user { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .sidebar-user .avatar {
+      width: 36px; height: 36px; border-radius: 50%; background: var(--gradient);
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff;
+    }
+    .sidebar-user-info { flex: 1; }
+    .sidebar-user-info .name { font-size: 13px; font-weight: 600; }
+    .sidebar-user-info .plan { font-size: 11px; color: var(--text-muted); }
+
+    .main-content { flex: 1; overflow-y: auto; }
+    .top-bar {
+      padding: 16px 24px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg-secondary);
+    }
+    .top-bar h2 { font-size: 16px; font-weight: 700; }
+    .content { padding: 24px; }
+
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: var(--radius-full);
+      font-size: 12px; font-weight: 600;
+      background: rgba(78,81,114,0.2); color: var(--text-muted);
+    }
+    .status-pill.live { background: rgba(255,92,92,0.12); color: #FF5C5C; }
+    .status-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .status-pill.live .dot { animation: pulseDot 1.5s infinite; }
+
+    .setup-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+      position: relative; overflow: hidden;
+    }
+    .setup-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--gradient);
+    }
+    .setup-row { display: flex; gap: 10px; margin-top: 14px; }
+    .setup-row input { flex: 1; }
+
+    .chat-box { height: 400px; overflow-y: auto; }
+    .msg {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 10px; border-radius: var(--radius-sm);
+      animation: fadeInUp 0.2s ease;
+    }
+    .msg:hover { background: rgba(108,99,255,0.03); }
+    .msg-avatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
+    .msg-content { flex: 1; min-width: 0; }
+    .msg-author { font-size: 13px; font-weight: 700; display: inline; }
+    .msg-author.owner { color: #FFD93D; } .msg-author.moderator { color: #5B8DEF; }
+    .msg-author.member { color: #00D68F; }
+    .msg-text { font-size: 13px; color: var(--text-secondary); display: inline; word-break: break-word; }
+    .msg-text .emoji { width: 18px; height: 18px; vertical-align: middle; }
+    .msg.superchat { background: rgba(255,217,61,0.06); border-left: 3px solid var(--yellow); }
+    .msg.membership { background: rgba(0,214,143,0.06); border-left: 3px solid var(--green); }
+    .msg-badge-label { font-size: 10px; background: var(--accent); color: #fff; padding: 1px 5px; border-radius: 3px; margin-right: 4px; }
+    .msg-time { font-size: 10px; color: var(--text-muted); margin-left: 6px; }
+
+    .overlay-link-box {
+      display: flex; align-items: center; gap: 10px; background: var(--bg-input);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 12px 16px; margin-top: 12px;
+    }
+    .overlay-link-box input {
+      flex: 1; background: none; border: none; color: var(--accent);
+      font-family: 'Courier New', monospace; font-size: 12px; outline: none;
+    }
+
+    .notif-item {
+      display: flex; gap: 12px; padding: 12px; border-bottom: 1px solid var(--border);
+      transition: var(--transition);
+    }
+    .notif-item:hover { background: var(--bg-hover); }
+    .notif-item.unread { border-left: 2px solid var(--accent); }
+    .notif-icon { font-size: 18px; }
+    .notif-text { flex: 1; }
+    .notif-title { font-size: 13px; font-weight: 600; }
+    .notif-msg { font-size: 12px; color: var(--text-secondary); }
+    .notif-time { font-size: 11px; color: var(--text-muted); }
+
+    .empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
+
+    .tab-content { display: none; } .tab-content.active { display: block; }
+
+    .lang-select-inline { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); padding: 4px 8px; font-size: 12px; cursor: pointer; }
+
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { width: 100%; } }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><h1>⚡ <span>Strevio</span></h1></div>
+      <nav class="sidebar-nav">
+        <a href="#" class="active" onclick="showTab('chat')">💬 <span data-i18n="dashboard.tabChat">Chat</span></a>
+        <a href="#" onclick="showTab('overlay')">🎬 <span data-i18n="dashboard.tabOverlay">Overlay</span></a>
+        <a href="#" onclick="showTab('analytics')">📊 <span data-i18n="dashboard.tabAnalytics">Statistics</span></a>
+        <a href="#" onclick="showTab('notifications')">🔔 <span data-i18n="dashboard.tabNotifications">Notifications</span> <span id="notifBadge" class="badge badge-active hidden" style="margin-left:auto"></span></a>
+        <a href="#" onclick="showTab('settings')">⚙️ <span data-i18n="dashboard.tabSettings">Settings</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="avatar" id="userAvatar">?</div>
+          <div class="sidebar-user-info">
+            <div class="name" id="userName">-</div>
+            <div class="plan" id="userPlan">-</div>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm btn-block" onclick="logout()" data-i18n="dashboard.logout">Logout</button>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <div class="top-bar">
+        <h2 id="pageTitle" data-i18n="dashboard.tabChat">Chat</h2>
+        <div class="status-pill" id="statusPill">
+          <span class="dot"></span>
+          <span id="statusText" data-i18n="dashboard.statusWaiting">Waiting</span>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="tab-content active" id="tab-chat">
+          <div class="setup-card" id="channelSetup">
+            <h3 data-i18n="dashboard.channelTitle">📡 Connect YouTube Channel</h3>
+            <p class="text-sm text-muted mt-1" data-i18n="dashboard.channelDesc">Enter your channel link. Chat will start automatically when you go live.</p>
+            <div class="setup-row">
+              <input type="text" class="form-input" id="channelInput" data-i18n-placeholder="dashboard.channelPlaceholder" placeholder="@handle or youtube.com/@handle or UCxxxxxx" />
+              <button class="btn btn-primary" id="btnSaveChannel" onclick="saveChannel()" data-i18n="dashboard.channelConnect">Connect</button>
+              <button class="btn btn-danger hidden" id="btnRemoveChannel" onclick="removeChannel()" data-i18n="dashboard.channelRemove">Remove</button>
+            </div>
+            <div id="channelStatus" class="mt-1 text-sm"></div>
+          </div>
+
+          <details style="margin-bottom:16px">
+            <summary style="cursor:pointer;font-size:13px;color:var(--text-muted)" data-i18n="dashboard.manualTitle">🔧 Manual connection (by video ID)</summary>
+            <div style="display:flex;gap:10px;margin-top:8px">
+              <input type="text" class="form-input" id="videoIdInput" data-i18n-placeholder="dashboard.manualPlaceholder" placeholder="Video ID or URL" style="flex:1" />
+              <button class="btn btn-outline btn-sm" id="btnManualStart" onclick="startChat()" data-i18n="dashboard.manualStart">Start</button>
+              <button class="btn btn-danger btn-sm" id="btnStop" onclick="stopChat()" disabled data-i18n="dashboard.manualStop">Stop</button>
+            </div>
+          </details>
+
+          <div class="stats-grid mb-2">
+            <div class="stat-card"><div class="stat-value" id="statMsgs">0</div><div class="stat-label" data-i18n="dashboard.statMessages">Messages</div></div>
+            <div class="stat-card"><div class="stat-value" id="statSC">0</div><div class="stat-label">Super Chat</div></div>
+            <div class="stat-card"><div class="stat-value" id="statMem">0</div><div class="stat-label" data-i18n="dashboard.statMemberships">Memberships</div></div>
+            <div class="stat-card"><div class="stat-value" id="statUptime">00:00</div><div class="stat-label" data-i18n="dashboard.statUptime">Uptime</div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2 data-i18n="dashboard.chatPreview">💬 Chat Preview</h2>
+              <button class="btn btn-ghost btn-sm" onclick="clearChat()" data-i18n="dashboard.chatClear">Clear</button>
+            </div>
+            <div class="card-body chat-box" id="chatMessages">
+              <div class="empty-state" id="chatEmpty"><div class="icon">💬</div><p data-i18n="dashboard.chatWaiting">Waiting for chat...</p><p class="text-xs text-muted mt-1" data-i18n="dashboard.chatWaitingSub">Connect your channel or enter a video ID manually.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-overlay">
+          <div class="card mb-2">
+            <div class="card-header"><h2 data-i18n="dashboard.overlayUrlTitle">🎬 OBS Overlay URL</h2></div>
+            <div class="card-body">
+              <p class="text-sm text-muted" data-i18n="dashboard.overlayUrlDesc">Add this URL as a <b>Browser Source</b> in OBS.</p>
+              <div class="overlay-link-box">
+                <input type="text" id="overlayUrl" readonly />
+                <button class="btn btn-sm btn-primary" onclick="copyUrl()" data-i18n="dashboard.overlayCopy">📋 Copy</button>
+              </div>
+              <div class="mt-2">
+                <button class="btn btn-sm btn-danger" onclick="regenerateToken()" data-i18n="dashboard.overlayRegenerate">🔄 Regenerate Token</button>
+              </div>
+
+              <div style="background:rgba(255,217,61,0.05);border:1px solid rgba(255,217,61,0.15);border-radius:var(--radius-sm);padding:14px;margin-top:16px">
+                <p style="font-size:12px;color:var(--yellow);font-weight:600;margin-bottom:4px" data-i18n="dashboard.obsSettingsTitle">🛠 OBS Settings</p>
+                <p style="font-size:12px;color:var(--text-secondary)"><span data-i18n="dashboard.obsWidth">Width</span>: <b>450</b> · <span data-i18n="dashboard.obsHeight">Height</span>: <b>700</b></p>
+                <p style="font-size:12px;color:var(--text-secondary)"><span data-i18n="dashboard.obsCustomCss">Custom CSS</span>: <code style="color:var(--accent);background:var(--bg-input);padding:1px 4px;border-radius:3px">body { background-color: rgba(0,0,0,0); }</code></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h2 data-i18n="dashboard.overlaySettingsTitle">🎨 Overlay Settings</h2></div>
+            <div class="card-body">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group"><label data-i18n="dashboard.overlayTheme">Theme</label>
+                  <select class="form-input" id="setTheme">
+                    <option value="default" data-i18n="dashboard.themeDefault">Default</option><option value="light" data-i18n="dashboard.themeLight">Light</option>
+                    <option value="neon" data-i18n="dashboard.themeNeon">Neon</option><option value="minimal" data-i18n="dashboard.themeMinimal">Minimal</option>
+                  </select>
+                </div>
+                <div class="form-group"><label data-i18n="dashboard.overlayFontSize">Font Size</label>
+                  <input type="number" class="form-input" id="setFontSize" value="14" min="10" max="28" />
+                </div>
+                <div class="form-group"><label data-i18n="dashboard.overlayMaxMsgs">Max Messages</label>
+                  <input type="number" class="form-input" id="setMaxMsgs" value="50" min="5" max="200" />
+                </div>
+                <div class="form-group"><label data-i18n="dashboard.overlayFadeTime">Fade Time (sec)</label>
+                  <input type="number" class="form-input" id="setFadeTime" value="60" min="0" max="600" />
+                </div>
+                <div class="form-group"><label data-i18n="dashboard.overlayBgOpacity">Background Opacity</label>
+                  <input type="range" id="setBgOpacity" min="0" max="1" step="0.05" value="0.55" style="width:100%" />
+                </div>
+                <div class="form-group"><label data-i18n="dashboard.overlayPosition">Position</label>
+                  <select class="form-input" id="setPosition">
+                    <option value="bottom-left" data-i18n="dashboard.posBottomLeft">Bottom Left</option>
+                    <option value="bottom-right" data-i18n="dashboard.posBottomRight">Bottom Right</option>
+                    <option value="top-left" data-i18n="dashboard.posTopLeft">Top Left</option>
+                    <option value="top-right" data-i18n="dashboard.posTopRight">Top Right</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex;gap:16px;margin-top:12px">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="setAvatars" checked /> <span data-i18n="dashboard.overlayAvatars">Avatars</span></label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="setBadges" checked /> <span data-i18n="dashboard.overlayBadges">Badges</span></label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="setTimestamps" /> <span data-i18n="dashboard.overlayTimestamps">Timestamps</span></label>
+              </div>
+              <div class="form-group mt-2">
+                <label data-i18n="dashboard.overlayCustomCss">Custom CSS</label>
+                <textarea class="form-input" id="setCustomCss" rows="3" data-i18n-placeholder="dashboard.overlayCustomCssPlaceholder" placeholder="Custom CSS rules..." style="font-family:monospace;font-size:12px"></textarea>
+              </div>
+              <button class="btn btn-primary mt-2" onclick="saveOverlaySettings()" data-i18n="dashboard.overlaySave">💾 Save</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-analytics">
+          <div class="stats-grid mb-2">
+            <div class="stat-card"><div class="stat-value" id="totalSessions">0</div><div class="stat-label" data-i18n="dashboard.analyticsTotalSessions">Total Sessions</div></div>
+            <div class="stat-card"><div class="stat-value" id="totalMsgs">0</div><div class="stat-label" data-i18n="dashboard.analyticsTotalMsgs">Total Messages</div></div>
+            <div class="stat-card"><div class="stat-value" id="totalSC">0</div><div class="stat-label" data-i18n="dashboard.analyticsTotalSC">Total Super Chats</div></div>
+            <div class="stat-card"><div class="stat-value" id="totalMem">0</div><div class="stat-label" data-i18n="dashboard.analyticsTotalMem">Total Memberships</div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h2 data-i18n="dashboard.analyticsSessionsTitle">📋 Recent Sessions</h2></div>
+            <div class="card-body">
+              <div class="table-container">
+                <table><thead><tr>
+                  <th data-i18n="dashboard.analyticsVideo">Video</th>
+                  <th data-i18n="dashboard.analyticsStatus">Status</th>
+                  <th data-i18n="dashboard.analyticsMsgs">Messages</th>
+                  <th>SC</th>
+                  <th data-i18n="dashboard.analyticsStart">Start</th>
+                  <th data-i18n="dashboard.analyticsEnd">End</th>
+                </tr></thead>
+                <tbody id="sessionsTable"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-notifications">
+          <div class="card">
+            <div class="card-header"><h2 data-i18n="dashboard.notifTitle">🔔 Notifications</h2>
+              <button class="btn btn-sm btn-ghost" onclick="markAllRead()" data-i18n="dashboard.notifMarkAll">Mark All Read</button>
+            </div>
+            <div class="card-body" id="notifList">
+              <div class="empty-state"><div class="icon">🔔</div><p data-i18n="dashboard.notifEmpty">No notifications</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-settings">
+          <div class="card mb-2">
+            <div class="card-header"><h2 data-i18n="dashboard.settingsLangTitle">🌐 Language</h2></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label data-i18n="dashboard.settingsLangLabel">Interface Language</label>
+                <select class="form-input lang-select-inline" id="settingsLangSwitch" style="max-width:200px"></select>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h2 data-i18n="dashboard.settingsProfileTitle">⚙️ Profile Settings</h2></div>
+            <div class="card-body">
+              <div class="form-group"><label data-i18n="dashboard.settingsUsername">Username</label>
+                <input type="text" class="form-input" id="setUsername" />
+              </div>
+              <button class="btn btn-primary" onclick="saveProfile()" data-i18n="dashboard.settingsSave">Save</button>
+              <hr />
+              <h3 class="mb-2" style="font-size:14px" data-i18n="dashboard.settingsChangePassTitle">Change Password</h3>
+              <div class="form-group"><label data-i18n="dashboard.settingsCurrentPass">Current Password</label>
+                <input type="password" class="form-input" id="currentPass" /></div>
+              <div class="form-group"><label data-i18n="dashboard.settingsNewPass">New Password</label>
+                <input type="password" class="form-input" id="newPass" /></div>
+              <button class="btn btn-primary" onclick="changePassword()" data-i18n="dashboard.settingsChangePass">Change Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/js/i18n.js"></script>
+  <script src="/assets/js/dashboard.js"></script>
+</body>
+</html>

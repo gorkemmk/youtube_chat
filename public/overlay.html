@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strevio Overlay</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { background: transparent !important; overflow: hidden; width: 100%; height: 100%; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', 'Segoe UI', sans-serif; color: #fff; }
+
+    #status {
+      position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+      font-size: 11px; padding: 4px 14px; border-radius: 99px;
+      background: none;
+      opacity: .8; z-index: 1000; display: flex; align-items: center; gap: 6px;
+      transition: opacity .4s; font-weight: 600; color: #fff;
+      text-shadow: var(--txt-outline);
+    }
+    #status.connected { }
+    #status .dot { width: 6px; height: 6px; border-radius: 50%; background: #999; box-shadow: 0 0 0 2px #000; }
+    #status.connected .dot { background: #00D68F; box-shadow: 0 0 0 2px #000; animation: blink 2s infinite; }
+    @keyframes blink { 50% { opacity: .4; } }
+
+    #chat {
+      position: fixed; bottom: 0; left: 0; width: 100%; padding: 0 12px 12px;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      max-height: 100vh; overflow: hidden;
+    }
+    #chat.top-left { top: 0; bottom: auto; left: 0; right: auto; justify-content: flex-start; }
+    #chat.top-right { top: 0; bottom: auto; right: 0; left: auto; justify-content: flex-start; }
+    #chat.bottom-right { bottom: 0; right: 0; left: auto; }
+    #chat.bottom-left { bottom: 0; left: 0; }
+
+    :root {
+      --txt-outline:
+        -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+        -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000,
+        0 0 6px rgba(0,0,0,.6);
+    }
+
+    .msg {
+      display: flex; align-items: flex-start; gap: 8px; padding: 4px 6px;
+      margin-bottom: 2px;
+      background: none !important; backdrop-filter: none !important;
+      animation: slideIn .35s cubic-bezier(.16,1,.3,1);
+      max-width: 560px;
+      transition: opacity .5s;
+    }
+    .msg.fading { opacity: 0; }
+
+    .msg-avatar {
+      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+      box-shadow: 0 0 0 2px #000, 0 0 0 3px rgba(255,255,255,.3);
+    }
+    .msg-author {
+      font-weight: 700; font-size: 13px; white-space: nowrap;
+      color: #C9A0FF;
+      text-shadow: var(--txt-outline);
+    }
+    .msg-author.owner  { color: #FFD93D; text-shadow: var(--txt-outline); }
+    .msg-author.moderator { color: #6EB5FF; text-shadow: var(--txt-outline); }
+    .msg-author.member { color: #2BFFA8; text-shadow: var(--txt-outline); }
+    .msg-text {
+      font-size: 13px; line-height: 1.4; color: #FFFFFF; word-break: break-word;
+      font-weight: 500;
+      text-shadow: var(--txt-outline);
+    }
+    .msg-time {
+      font-size: 10px; color: #ccc; margin-left: auto; white-space: nowrap; padding-top: 2px;
+      text-shadow: var(--txt-outline);
+    }
+
+    .msg.superchat { border: none; }
+    .msg.superchat .msg-author { color: #FFD93D; }
+    .sc-amount {
+      font-size: 11px; font-weight: 700; color: #FFD93D;
+      background: none; padding: 0; margin-right: 4px;
+      text-shadow: var(--txt-outline);
+    }
+
+    .msg.membership { border: none; }
+    .msg.membership .msg-author { color: #2BFFA8; }
+    .mem-badge {
+      font-size: 10px; font-weight: 700; color: #2BFFA8;
+      background: none; padding: 0; margin-right: 4px;
+      text-shadow: var(--txt-outline);
+    }
+
+    @keyframes slideIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+
+    #waiting {
+      position: fixed; bottom: 20px; left: 20px;
+      font-size: 12px; padding: 6px 14px;
+      background: none; border-radius: 8px;
+      opacity: .85; display: flex; align-items: center; gap: 8px;
+      color: #fff; font-weight: 600;
+      text-shadow: var(--txt-outline);
+    }
+    #waiting .spinner {
+      width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2);
+      border-top-color: #6C63FF; border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+  <style id="customStyle"></style>
+</head>
+<body>
+
+<div id="status"><span class="dot"></span><span id="statusText">Connecting...</span></div>
+<div id="waiting"><div class="spinner"></div> Waiting for stream...</div>
+<div id="chat"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function () {
+  const pathParts = location.pathname.split('/');
+  const overlayToken = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2];
+  if (!overlayToken || overlayToken === 'overlay') {
+    document.getElementById('statusText').textContent = 'Overlay token not found';
+    return;
+  }
+
+  let settings = {
+    theme: 'default',
+    font_size: 14,
+    max_messages: 50,
+    fade_time: 60,
+    bg_opacity: 0.45,
+    position: 'bottom-left',
+    show_avatars: true,
+    show_badges: true,
+    show_timestamps: false,
+    custom_css: ''
+  };
+
+  const chatEl = document.getElementById('chat');
+  const statusEl = document.getElementById('status');
+  const statusText = document.getElementById('statusText');
+  const waitingEl = document.getElementById('waiting');
+
+  function applySettings(s) {
+    settings = { ...settings, ...s };
+    document.body.style.fontSize = settings.font_size + 'px';
+    chatEl.className = settings.position || 'bottom-left';
+
+    let styleEl = document.getElementById('customStyle');
+    if (!styleEl) { styleEl = document.createElement('style'); styleEl.id = 'customStyle'; document.head.appendChild(styleEl); }
+    styleEl.textContent = settings.custom_css || '';
+  }
+
+  const socket = io('/overlay', { query: { token: overlayToken } });
+
+  fetch(`/overlay/${overlayToken}/settings`)
+    .then(r => r.json())
+    .then(d => { if (d.success) applySettings(d.data); })
+    .catch(() => {});
+
+  socket.on('connect', () => {
+    statusEl.classList.add('connected');
+    statusText.textContent = 'Connected';
+    setTimeout(() => { statusEl.style.opacity = '0'; }, 3000);
+  });
+
+  socket.on('disconnect', () => {
+    statusEl.classList.remove('connected');
+    statusEl.style.opacity = '.8';
+    statusText.textContent = 'Disconnected';
+  });
+
+  socket.on('overlay:settings', applySettings);
+
+  socket.on('chat:message', addMessage);
+
+  socket.on('chat:history', (messages) => { messages.forEach(addMessage); });
+
+  socket.on('chat:status', (data) => {
+    if (data.running) {
+      waitingEl.style.display = 'none';
+    } else {
+      waitingEl.style.display = 'flex';
+    }
+  });
+
+  function addMessage(msg) {
+    waitingEl.style.display = 'none';
+    const el = document.createElement('div');
+    let cls = 'msg';
+    if (msg.type === 'superchat') cls += ' superchat';
+    if (msg.type === 'membership') cls += ' membership';
+    el.className = cls;
+
+    let html = '';
+    if (settings.show_avatars && msg.author?.thumbnail) {
+      html += `<img class="msg-avatar" src="${msg.author.thumbnail}" alt="" onerror="this.style.display='none'" />`;
+    }
+    html += '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:3px;">';
+
+    if (msg.type === 'superchat' && msg.superchat) {
+      html += `<span class="sc-amount">💰 ${esc(msg.superchat.amount)}</span>`;
+    }
+    if (msg.type === 'membership') {
+      html += `<span class="mem-badge">🎉 Member</span>`;
+    }
+
+    const aCls = msg.author?.badge?.type || 'normal';
+    html += `<span class="msg-author ${aCls}">${esc(msg.author?.name || '?')}</span>`;
+    html += `<span class="msg-text">${msg.message || ''}</span>`;
+
+    if (settings.show_timestamps && msg.timestamp) {
+      const t = new Date(msg.timestamp);
+      html += `<span class="msg-time">${t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+
+    chatEl.appendChild(el);
+
+    while (chatEl.children.length > settings.max_messages) {
+      chatEl.firstChild?.remove();
+    }
+
+    chatEl.scrollTop = chatEl.scrollHeight;
+
+    if (settings.fade_time > 0) {
+      setTimeout(() => {
+        el.classList.add('fading');
+        setTimeout(() => el.remove(), 600);
+      }, settings.fade_time * 1000);
+    }
+  }
+
+  function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+})();
+</script>
+</body>
+</html>
