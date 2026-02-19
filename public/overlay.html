@@ -7,110 +7,132 @@
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { background: transparent !important; overflow: hidden; width: 100%; height: 100%; }
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    body { font-family: 'Inter', 'Segoe UI', sans-serif; color: #fff; }
-
-    #status {
-      position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-      font-size: 11px; padding: 4px 14px; border-radius: 99px;
-      background: none;
-      opacity: .8; z-index: 1000; display: flex; align-items: center; gap: 6px;
-      transition: opacity .4s; font-weight: 600; color: #fff;
-      text-shadow: var(--txt-outline);
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    body { 
+      font-family: 'Inter', 'Segoe UI', sans-serif; 
+      color: #fff; 
+      -webkit-font-smoothing: antialiased;
     }
-    #status.connected { }
-    #status .dot { width: 6px; height: 6px; border-radius: 50%; background: #999; box-shadow: 0 0 0 2px #000; }
-    #status.connected .dot { background: #00D68F; box-shadow: 0 0 0 2px #000; animation: blink 2s infinite; }
-    @keyframes blink { 50% { opacity: .4; } }
 
+    :root {
+      /* Daha yumuşak ve okunaklı yayıncı font gölgesi */
+      --txt-outline:
+        -1px -1px 0 rgba(0,0,0,0.8), 
+         1px -1px 0 rgba(0,0,0,0.8), 
+        -1px  1px 0 rgba(0,0,0,0.8), 
+         1px  1px 0 rgba(0,0,0,0.8),
+         0px  2px 4px rgba(0,0,0,0.6);
+    }
+
+    /* Durum ve Bekleme Göstergeleri */
+    #status {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      font-size: 11px; padding: 6px 16px; border-radius: 99px;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      opacity: .9; z-index: 1000; display: flex; align-items: center; gap: 8px;
+      transition: all .4s ease; font-weight: 600; color: #fff;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    #status .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4757; box-shadow: 0 0 8px #ff4757; }
+    #status.connected .dot { background: #00D68F; box-shadow: 0 0 8px #00D68F; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
+
+    #waiting {
+      position: fixed; bottom: 24px; left: 24px;
+      font-size: 13px; padding: 10px 18px;
+      background: rgba(15, 15, 20, 0.6); backdrop-filter: blur(10px);
+      border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+      opacity: 1; display: flex; align-items: center; gap: 10px;
+      color: #e2e8f0; font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    #waiting .spinner {
+      width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.2);
+      border-top-color: #6C63FF; border-radius: 50%;
+      animation: spin .8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Chat Konteyner */
     #chat {
-      position: fixed; bottom: 0; left: 0; width: 100%; padding: 0 12px 12px;
+      position: fixed; bottom: 0; left: 0; width: 100%; padding: 0 20px 20px;
       display: flex; flex-direction: column; justify-content: flex-end;
       max-height: 100vh; overflow: hidden;
+      perspective: 1000px;
     }
-    #chat.top-left { top: 0; bottom: auto; left: 0; right: auto; justify-content: flex-start; }
+    #chat.top-left { top: 0; bottom: auto; justify-content: flex-start; }
     #chat.top-right { top: 0; bottom: auto; right: 0; left: auto; justify-content: flex-start; }
     #chat.bottom-right { bottom: 0; right: 0; left: auto; }
     #chat.bottom-left { bottom: 0; left: 0; }
 
-    :root {
-      --txt-outline:
-        -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
-        -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000,
-        0 0 6px rgba(0,0,0,.6);
-    }
-
+    /* Mesaj Tasarımları */
     .msg {
-      display: flex; align-items: flex-start; gap: 8px; padding: 4px 6px;
-      margin-bottom: 2px;
-      background: none !important; backdrop-filter: none !important;
-      animation: slideIn .35s cubic-bezier(.16,1,.3,1);
-      max-width: 560px;
-      transition: opacity .5s;
+      display: flex; align-items: flex-start; gap: 10px; padding: 4px 8px;
+      margin-bottom: 6px;
+      background: transparent !important;
+      animation: slideIn .4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; /* Spring efekti */
+      max-width: 600px;
+      transform-origin: left bottom;
+      transition: opacity .5s ease, transform .5s ease;
     }
-    .msg.fading { opacity: 0; }
+    .msg.fading { opacity: 0; transform: scale(0.9) translateY(10px); }
 
     .msg-avatar {
-      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
-      box-shadow: 0 0 0 2px #000, 0 0 0 3px rgba(255,255,255,.3);
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5);
+      object-fit: cover;
     }
+    
+    .msg-content { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }
+
     .msg-author {
-      font-weight: 700; font-size: 13px; white-space: nowrap;
-      color: #C9A0FF;
-      text-shadow: var(--txt-outline);
+      font-weight: 800; font-size: 14px; white-space: nowrap;
+      color: #C9A0FF; text-shadow: var(--txt-outline); letter-spacing: 0.2px;
     }
-    .msg-author.owner  { color: #FFD93D; text-shadow: var(--txt-outline); }
-    .msg-author.moderator { color: #6EB5FF; text-shadow: var(--txt-outline); }
-    .msg-author.member { color: #2BFFA8; text-shadow: var(--txt-outline); }
+    .msg-author.owner  { color: #FFD93D; }
+    .msg-author.moderator { color: #6EB5FF; }
+    .msg-author.member { color: #2BFFA8; }
+
     .msg-text {
-      font-size: 13px; line-height: 1.4; color: #FFFFFF; word-break: break-word;
-      font-weight: 500;
-      text-shadow: var(--txt-outline);
+      font-size: 14px; line-height: 1.5; color: #FFFFFF; word-break: break-word;
+      font-weight: 600; text-shadow: var(--txt-outline);
     }
+    
     .msg-time {
-      font-size: 10px; color: #ccc; margin-left: auto; white-space: nowrap; padding-top: 2px;
-      text-shadow: var(--txt-outline);
+      font-size: 11px; color: #94a3b8; margin-left: auto; white-space: nowrap; padding-top: 2px;
+      text-shadow: var(--txt-outline); font-weight: 500;
     }
 
-    .msg.superchat { border: none; }
+    /* Özel Mesaj Türleri (Superchat & Member) */
     .msg.superchat .msg-author { color: #FFD93D; }
     .sc-amount {
-      font-size: 11px; font-weight: 700; color: #FFD93D;
-      background: none; padding: 0; margin-right: 4px;
-      text-shadow: var(--txt-outline);
+      font-size: 12px; font-weight: 800; color: #FFD93D;
+      background: rgba(255, 217, 61, 0.2); padding: 2px 6px; border-radius: 4px;
+      border: 1px solid rgba(255, 217, 61, 0.4);
+      margin-right: 4px; text-shadow: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
 
-    .msg.membership { border: none; }
     .msg.membership .msg-author { color: #2BFFA8; }
     .mem-badge {
-      font-size: 10px; font-weight: 700; color: #2BFFA8;
-      background: none; padding: 0; margin-right: 4px;
-      text-shadow: var(--txt-outline);
+      font-size: 12px; font-weight: 800; color: #2BFFA8;
+      background: rgba(43, 255, 168, 0.2); padding: 2px 6px; border-radius: 4px;
+      border: 1px solid rgba(43, 255, 168, 0.4);
+      margin-right: 4px; text-shadow: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
 
-    @keyframes slideIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-
-    #waiting {
-      position: fixed; bottom: 20px; left: 20px;
-      font-size: 12px; padding: 6px 14px;
-      background: none; border-radius: 8px;
-      opacity: .85; display: flex; align-items: center; gap: 8px;
-      color: #fff; font-weight: 600;
-      text-shadow: var(--txt-outline);
+    @keyframes slideIn { 
+      0% { opacity: 0; transform: translateX(-20px) scale(0.95); } 
+      100% { opacity: 1; transform: translateX(0) scale(1); } 
     }
-    #waiting .spinner {
-      width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2);
-      border-top-color: #6C63FF; border-radius: 50%;
-      animation: spin .8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
   <style id="customStyle"></style>
 </head>
 <body>
 
 <div id="status"><span class="dot"></span><span id="statusText">Connecting...</span></div>
-<div id="waiting"><div class="spinner"></div> Waiting for stream...</div>
+<div id="waiting"><div class="spinner"></div> Stream bekleniyor...</div>
 <div id="chat"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -119,21 +141,14 @@
   const pathParts = location.pathname.split('/');
   const overlayToken = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2];
   if (!overlayToken || overlayToken === 'overlay') {
-    document.getElementById('statusText').textContent = 'Overlay token not found';
+    document.getElementById('statusText').textContent = 'Token bulunamadı';
     return;
   }
 
   let settings = {
-    theme: 'default',
-    font_size: 14,
-    max_messages: 50,
-    fade_time: 60,
-    bg_opacity: 0.45,
-    position: 'bottom-left',
-    show_avatars: true,
-    show_badges: true,
-    show_timestamps: false,
-    custom_css: ''
+    theme: 'default', font_size: 14, max_messages: 50, fade_time: 60,
+    bg_opacity: 0.45, position: 'bottom-left', show_avatars: true,
+    show_badges: true, show_timestamps: false, custom_css: ''
   };
 
   const chatEl = document.getElementById('chat');
@@ -160,28 +175,22 @@
 
   socket.on('connect', () => {
     statusEl.classList.add('connected');
-    statusText.textContent = 'Connected';
+    statusText.textContent = 'Bağlandı';
     setTimeout(() => { statusEl.style.opacity = '0'; }, 3000);
   });
 
   socket.on('disconnect', () => {
     statusEl.classList.remove('connected');
-    statusEl.style.opacity = '.8';
-    statusText.textContent = 'Disconnected';
+    statusEl.style.opacity = '1';
+    statusText.textContent = 'Bağlantı Koptu';
   });
 
   socket.on('overlay:settings', applySettings);
-
   socket.on('chat:message', addMessage);
-
   socket.on('chat:history', (messages) => { messages.forEach(addMessage); });
 
   socket.on('chat:status', (data) => {
-    if (data.running) {
-      waitingEl.style.display = 'none';
-    } else {
-      waitingEl.style.display = 'flex';
-    }
+    waitingEl.style.display = data.running ? 'none' : 'flex';
   });
 
   function addMessage(msg) {
@@ -196,13 +205,14 @@
     if (settings.show_avatars && msg.author?.thumbnail) {
       html += `<img class="msg-avatar" src="${msg.author.thumbnail}" alt="" onerror="this.style.display='none'" />`;
     }
-    html += '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:3px;">';
+    
+    html += '<div class="msg-content">';
 
     if (msg.type === 'superchat' && msg.superchat) {
       html += `<span class="sc-amount">💰 ${esc(msg.superchat.amount)}</span>`;
     }
     if (msg.type === 'membership') {
-      html += `<span class="mem-badge">🎉 Member</span>`;
+      html += `<span class="mem-badge">🎉 Üye</span>`;
     }
 
     const aCls = msg.author?.badge?.type || 'normal';
@@ -227,7 +237,7 @@
     if (settings.fade_time > 0) {
       setTimeout(() => {
         el.classList.add('fading');
-        setTimeout(() => el.remove(), 600);
+        setTimeout(() => el.remove(), 500);
       }, settings.fade_time * 1000);
     }
   }
