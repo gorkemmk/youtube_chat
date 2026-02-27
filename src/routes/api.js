@@ -122,11 +122,12 @@ router.post('/overlay/settings', async (req, res) => {
 });
 
 router.get('/overlay/token', (req, res) => {
+  const proto = req.get('x-forwarded-proto') || req.protocol;
   res.json({
     success: true,
     data: {
       token: req.user.overlay_token,
-      url: `${req.protocol}://${req.get('host')}/overlay/${req.user.overlay_token}`,
+      url: `${proto}://${req.get('host')}/overlay/${req.user.overlay_token}`,
     },
   });
 });
@@ -134,11 +135,12 @@ router.get('/overlay/token', (req, res) => {
 router.post('/overlay/token/regenerate', async (req, res) => {
   const newToken = uuidv4();
   await userOps.regenerateToken(req.user.id, newToken);
+  const proto = req.get('x-forwarded-proto') || req.protocol;
   res.json({
     success: true,
     data: {
       token: newToken,
-      url: `${req.protocol}://${req.get('host')}/overlay/${newToken}`,
+      url: `${proto}://${req.get('host')}/overlay/${newToken}`,
     },
   });
 });

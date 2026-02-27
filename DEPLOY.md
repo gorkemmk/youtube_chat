@@ -1,24 +1,24 @@
-# Strevio — Production Deployment Guide (aaPanel)
+# Strevio — aaPanel Deployment Rehberi
 
-Complete guide to deploying Strevio on a Linux server using **aaPanel**, **PostgreSQL**, **Node.js**, **PM2**, and **Nginx**.
+aaPanel üzerinde **MySQL**, **Node.js**, **PM2** ve **Nginx** ile deploy etme rehberi.
 
 ---
 
-## 1. Server Requirements
+## 1. Sunucu Gereksinimleri
 
-| Component | Minimum |
-|-----------|---------|
+| Bileşen | Minimum |
+|---------|---------|
 | OS | Ubuntu 20.04+ / CentOS 7+ |
-| RAM | 1 GB (2 GB recommended) |
+| RAM | 1 GB (2 GB önerilir) |
 | CPU | 1 vCPU |
 | Disk | 10 GB SSD |
-| aaPanel | Latest version |
+| aaPanel | Son sürüm |
 
 ---
 
-## 2. aaPanel Initial Setup
+## 2. aaPanel Kurulumu
 
-### 2.1 Install aaPanel
+### 2.1 aaPanel Yükle (eğer yoksa)
 ```bash
 # Ubuntu/Debian
 wget -O install.sh http://www.aapanel.com/script/install-ubuntu_6.0_en.sh && sudo bash install.sh
@@ -27,114 +27,125 @@ wget -O install.sh http://www.aapanel.com/script/install-ubuntu_6.0_en.sh && sud
 yum install -y wget && wget -O install.sh http://www.aapanel.com/script/install_6.0_en.sh && bash install.sh
 ```
 
-After installation, note the panel URL, username, and password from the output.
+Kurulumdan sonra ekrandaki **panel URL**, **kullanıcı adı** ve **şifre** bilgilerini not et.
 
-### 2.2 Install Required Software via aaPanel
-Go to **App Store** and install:
-- **Nginx** (latest)
-- **PostgreSQL 15+**
-- **Node.js version manager** (install Node.js 18 LTS or 20 LTS)
-- **PM2 Manager** (if available, or install via CLI)
+### 2.2 aaPanel App Store'dan Yükle
+**App Store** → aşağıdakileri yükle:
+- **Nginx** (son sürüm)
+- **MySQL 5.7+** veya **MySQL 8.0**
+- **PM2 Manager** (varsa)
 
----
-
-## 3. PostgreSQL Setup
-
-### 3.1 Create Database & User
-
+### 2.3 Node.js Yükle
+Terminal'e bağlan (aaPanel → Terminal veya SSH):
 ```bash
-# Switch to postgres user
-sudo -u postgres psql
-
-# In psql shell:
-CREATE USER strevio WITH PASSWORD 'YOUR_STRONG_PASSWORD_HERE';
-CREATE DATABASE strevio OWNER strevio;
-GRANT ALL PRIVILEGES ON DATABASE strevio TO strevio;
-\q
-```
-
-### 3.2 Allow Local Connections
-
-Edit `pg_hba.conf` (usually at `/etc/postgresql/15/main/pg_hba.conf`):
-```
-# Add this line:
-local   strevio   strevio   md5
-host    strevio   strevio   127.0.0.1/32   md5
-```
-
-Restart PostgreSQL:
-```bash
-sudo systemctl restart postgresql
+# Node.js 18 LTS kur (nvm ile)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+nvm install 18
+nvm use 18
+node -v   # v18.x.x çıkmalı
 ```
 
 ---
 
-## 4. Deploy Application
+## 3. MySQL Veritabanı Oluştur
 
-### 4.1 Upload Project Files
+### Seçenek A: aaPanel Panelinden
+1. **Databases** → **Add Database**
+2. Bilgileri gir:
+   - **Database name:** `strevio`
+   - **Username:** `strevio`
+   - **Password:** (güçlü bir şifre belirle, not et)
+   - **Access:** `Local`
+3. **Submit** tıkla
 
-Upload project files to your server, e.g. `/www/wwwroot/strevio/`
-
+### Seçenek B: Terminal'den
 ```bash
-# Option 1: Git clone
+mysql -u root -p
+
+# MySQL shell:
+CREATE DATABASE strevio CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'strevio'@'localhost' IDENTIFIED BY 'GUCLU_SIFRE_BURAYA';
+GRANT ALL PRIVILEGES ON strevio.* TO 'strevio'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+---
+
+## 4. Proje Dosyalarını Yükle
+
+### Seçenek A: Git ile (önerilir)
+```bash
 cd /www/wwwroot
-git clone YOUR_REPO_URL strevio
-
-# Option 2: Upload via aaPanel File Manager
-# Or use SCP/SFTP
+git clone https://github.com/gorkemmk/youtube_chat.git strevio
+cd strevio
 ```
 
-### 4.2 Install Dependencies
+### Seçenek B: aaPanel File Manager ile
+1. **Files** → `/www/wwwroot/` dizinine git
+2. Zip dosyasını yükle ve çıkart
+3. Klasör adını `strevio` yap
+
+---
+
+## 5. Ortam Değişkenlerini Ayarla
+
+```bash
+cd /www/wwwroot/strevio
+nano .env
+```
+
+`.env` dosyası:
+```env
+PORT=3000
+JWT_SECRET=BURAYA_UZUN_RANDOM_STRING_KOY
+ADMIN_EMAIL=admin@senindomain.com
+ADMIN_PASSWORD=GUCLU_ADMIN_SIFRESI
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=strevio
+DB_PASSWORD=MYSQL_SIFREN_BURAYA
+DB_NAME=strevio
+NODE_ENV=production
+```
+
+> **ÖNEMLİ**: JWT_SECRET için rastgele string üret:
+> ```bash
+> openssl rand -hex 64
+> ```
+
+---
+
+## 6. Bağımlılıkları Yükle ve Test Et
 
 ```bash
 cd /www/wwwroot/strevio
 npm install --production
-```
 
-### 4.3 Configure Environment
-
-Create/edit `.env` file:
-```bash
-nano /www/wwwroot/strevio/.env
-```
-
-```env
-PORT=3000
-JWT_SECRET=GENERATE_A_LONG_RANDOM_STRING_HERE
-ADMIN_EMAIL=admin@yourdomain.com
-ADMIN_PASSWORD=YOUR_STRONG_ADMIN_PASSWORD
-DATABASE_URL=postgresql://strevio:YOUR_STRONG_PASSWORD_HERE@localhost:5432/strevio
-NODE_ENV=production
-```
-
-> **IMPORTANT**: Generate JWT_SECRET with: `openssl rand -hex 64`
-
-### 4.4 Test Startup
-
-```bash
-cd /www/wwwroot/strevio
+# Test et
 node server.js
 ```
 
-You should see:
+Şunu görmelisin:
 ```
-⚡ Strevio running on http://localhost:3000
+🚀 Strevio - YouTube Chat SaaS Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏠 Home       : http://localhost:3000
 ```
 
-Press `Ctrl+C` to stop.
+`Ctrl+C` ile durdur.
 
 ---
 
-## 5. PM2 Process Manager
+## 7. PM2 ile Çalıştır (Otomatik Başlatma)
 
-### 5.1 Install PM2 (if not via aaPanel)
-
+### 7.1 PM2 Kur
 ```bash
 npm install -g pm2
 ```
 
-### 5.2 Create PM2 Ecosystem File
-
+### 7.2 Ecosystem Dosyası Oluştur
 ```bash
 nano /www/wwwroot/strevio/ecosystem.config.js
 ```
@@ -163,55 +174,44 @@ module.exports = {
 };
 ```
 
-### 5.3 Start with PM2
-
+### 7.3 Başlat
 ```bash
-# Create logs directory
 mkdir -p /www/wwwroot/strevio/logs
-
-# Start
 cd /www/wwwroot/strevio
 pm2 start ecosystem.config.js
-
-# Save PM2 process list (auto-start on reboot)
 pm2 save
 pm2 startup
 ```
 
-### 5.4 Useful PM2 Commands
-
+### 7.4 PM2 Komutları
 ```bash
-pm2 status              # Check status
-pm2 logs strevio        # View logs
-pm2 restart strevio     # Restart
-pm2 stop strevio        # Stop
-pm2 monit               # Real-time monitoring
+pm2 status              # Durumu gör
+pm2 logs strevio        # Logları gör
+pm2 restart strevio     # Yeniden başlat
+pm2 stop strevio        # Durdur
+pm2 monit               # Canlı izleme
 ```
 
 ---
 
-## 6. Nginx Reverse Proxy
+## 8. Nginx Reverse Proxy
 
-### 6.1 Create Website in aaPanel
+### 8.1 aaPanel'de Website Oluştur
+1. **Website** → **Add site**
+2. Domain gir (örn: `strevio.senindomain.com`)
+3. **Static** website seç
+4. Oluştur
 
-1. Go to **Website** → **Add site**
-2. Enter your domain (e.g. `strevio.yourdomain.com`)
-3. Select **Static** website type
-4. Create the site
-
-### 6.2 Configure Nginx
-
-Go to the site settings → **Config** (or edit the Nginx config file directly).
-
-Replace the `server` block with:
+### 8.2 Nginx Ayarını Değiştir
+Site ayarları → **Config** → server bloğunu şununla değiştir:
 
 ```nginx
 server {
     listen 80;
     listen [::]:80;
-    server_name strevio.yourdomain.com;
+    server_name strevio.senindomain.com;
 
-    # Redirect to HTTPS (after SSL setup)
+    # HTTPS aktifken bu satırı aç:
     # return 301 https://$host$request_uri;
 
     location / {
@@ -224,12 +224,12 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # WebSocket timeout (important for Socket.IO)
+        # WebSocket timeout (Socket.IO için önemli!)
         proxy_read_timeout 86400s;
         proxy_send_timeout 86400s;
     }
 
-    # Static files caching
+    # Statik dosyalar için cache
     location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
         proxy_pass http://127.0.0.1:3000;
         expires 7d;
@@ -241,8 +241,7 @@ server {
 }
 ```
 
-### 6.3 Test & Reload Nginx
-
+### 8.3 Test Et
 ```bash
 nginx -t
 systemctl reload nginx
@@ -250,109 +249,111 @@ systemctl reload nginx
 
 ---
 
-## 7. SSL Certificate (HTTPS)
+## 9. SSL Sertifikası (HTTPS)
 
-### Via aaPanel:
-1. Go to **Website** → your site → **SSL**
-2. Choose **Let's Encrypt**
-3. Enter your domain and click **Apply**
-4. Enable **Force HTTPS**
+### aaPanel'den:
+1. **Website** → siteniz → **SSL**
+2. **Let's Encrypt** seç
+3. Domain gir → **Apply**
+4. **Force HTTPS** aç
 
-### Or via Certbot CLI:
+### Veya CLI'dan:
 ```bash
 apt install certbot python3-certbot-nginx
-certbot --nginx -d strevio.yourdomain.com
+certbot --nginx -d strevio.senindomain.com
 ```
 
-After SSL is active, uncomment the `return 301` line in the Nginx config above.
+SSL aktif olduktan sonra Nginx config'deki `return 301` satırının başındaki `#` işaretini kaldır.
 
 ---
 
-## 8. Firewall Rules
+## 10. Firewall Ayarları
 
-In aaPanel **Security** → **Firewall**, ensure these ports are open:
+aaPanel → **Security** → **Firewall**:
 
-| Port | Purpose |
-|------|---------|
+| Port | Amaç |
+|------|-------|
 | 80 | HTTP |
 | 443 | HTTPS |
 | 22 | SSH |
-| 5432 | PostgreSQL (only if remote access needed, usually NOT) |
+| 3306 | MySQL (sadece gerekirse, normalde KAPALI) |
 
 ---
 
-## 9. Updating
+## 11. Güncelleme
 
 ```bash
 cd /www/wwwroot/strevio
-
-# Pull latest code
 git pull origin main
-
-# Install new dependencies
 npm install --production
-
-# Restart
 pm2 restart strevio
 ```
 
 ---
 
-## 10. Monitoring & Maintenance
+## 12. Yedekleme
 
-### View Logs
+### MySQL Yedek
 ```bash
-pm2 logs strevio --lines 50
+# Manuel yedek
+mysqldump -u strevio -p strevio > /backup/strevio_$(date +%Y%m%d).sql
+
+# Otomatik (aaPanel Cron ile her gece 3'te):
+0 3 * * * mysqldump -u strevio -pSIFREN strevio > /backup/strevio_$(date +\%Y\%m\%d).sql
 ```
 
-### Database Backup
+### Yedeği Geri Yükleme
 ```bash
-# Manual backup
-pg_dump -U strevio strevio > /backup/strevio_$(date +%Y%m%d).sql
-
-# Cron job (daily at 3 AM) — add via aaPanel Cron
-0 3 * * * pg_dump -U strevio strevio > /backup/strevio_$(date +\%Y\%m\%d).sql
-```
-
-### Health Check
-```bash
-curl http://localhost:3000/api/health
-# Should return: {"success":true}
+mysql -u strevio -p strevio < /backup/strevio_20260219.sql
 ```
 
 ---
 
-## 11. Troubleshooting
+## 13. Sorun Giderme
 
-| Problem | Solution |
-|---------|----------|
-| `ECONNREFUSED 5432` | PostgreSQL not running: `systemctl start postgresql` |
-| `EACCES port 3000` | Port in use: `lsof -i :3000`, change PORT in .env |
-| WebSocket issues | Ensure Nginx has `proxy_set_header Upgrade` and `Connection "upgrade"` |
-| 502 Bad Gateway | PM2 crashed: `pm2 restart strevio && pm2 logs` |
-| Database auth error | Check DATABASE_URL credentials match psql user |
-| `better-sqlite3` error | Old dependency — run `npm install` to get `pg` instead |
+| Problem | Çözüm |
+|---------|-------|
+| `ECONNREFUSED 3306` | MySQL çalışmıyor: `systemctl start mysql` |
+| `ER_ACCESS_DENIED_ERROR` | .env'deki DB_USER/DB_PASSWORD'u kontrol et |
+| `EACCES port 3000` | Port meşgul: `lsof -i :3000` veya .env'de PORT değiştir |
+| WebSocket bağlanmıyor | Nginx'te `proxy_set_header Upgrade` ve `Connection "upgrade"` olmalı |
+| 502 Bad Gateway | PM2 çökmüş: `pm2 restart strevio && pm2 logs` |
+| Sayfa yüklenmiyor | `pm2 logs strevio` ile hata mesajını kontrol et |
 
 ---
 
-## Quick Start Summary
+## Hızlı Özet (Tüm Adımlar)
 
 ```bash
-# 1. Upload files to /www/wwwroot/strevio/
-# 2. Create PostgreSQL database
-sudo -u postgres psql -c "CREATE USER strevio WITH PASSWORD 'yourpass'; CREATE DATABASE strevio OWNER strevio;"
+# 1. Dosyaları yükle
+cd /www/wwwroot
+git clone https://github.com/gorkemmk/youtube_chat.git strevio
 
-# 3. Configure .env
-cp .env.example .env  # or create manually
-nano .env
+# 2. MySQL veritabanı oluştur (aaPanel → Databases → Add Database)
+#    Adı: strevio, Kullanıcı: strevio, Şifre: belirlediğin şifre
 
-# 4. Install & start
+# 3. .env ayarla
 cd /www/wwwroot/strevio
+nano .env
+# PORT=3000
+# JWT_SECRET=openssl-ile-uretilen-string
+# ADMIN_EMAIL=admin@domain.com
+# ADMIN_PASSWORD=guclu-sifre
+# DB_HOST=localhost
+# DB_PORT=3306
+# DB_USER=strevio
+# DB_PASSWORD=mysql-sifren
+# DB_NAME=strevio
+# NODE_ENV=production
+
+# 4. Kur ve başlat
 npm install --production
+npm install -g pm2
+mkdir -p logs
 pm2 start ecosystem.config.js
 pm2 save && pm2 startup
 
-# 5. Configure Nginx reverse proxy in aaPanel
-# 6. Add SSL via aaPanel → SSL → Let's Encrypt
-# Done! 🎉
+# 5. aaPanel'de Nginx reverse proxy ayarla (yukarıdaki config)
+# 6. SSL sertifikası ekle (aaPanel → SSL → Let's Encrypt)
+# Bitti! 🎉
 ```
